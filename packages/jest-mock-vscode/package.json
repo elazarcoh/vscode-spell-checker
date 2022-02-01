@@ -1,12 +1,11 @@
 {
   "name": "jest-mock-vscode",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "VS Code Mock for jest",
   "main": "index.js",
   "types": "dist/index.d.ts",
   "author": "Jason Dent",
   "license": "MIT",
-  "private": true,
   "scripts": {
     "test": "jest",
     "lint": "echo Lint",
@@ -20,19 +19,25 @@
     "*.d.ts",
     "dist/**"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/streetsidesoftware/vscode-spell-checker.git",
+    "directory": "packages/jest-mock-vscode"
+  },
   "devDependencies": {
-    "@types/jest": "^27.0.0",
-    "@types/node": "16",
-    "@types/vscode": "^1.57.0",
-    "jest": "^27.0.5",
+    "@tsconfig/node14": "^1.0.1",
+    "@types/jest": "^27.4.0",
+    "@types/node": "17",
+    "@types/vscode": "^1.63.1",
+    "jest": "^27.4.7",
     "rfdc": "^1.3.0",
-    "ts-jest": "^27.0.3",
-    "typescript": "^4.3.5"
+    "ts-jest": "^27.1.3",
+    "typescript": "^4.5.5"
   },
   "peerDependencies": {
     "jest": "^27.0.5"
   },
   "dependencies": {
-    "vscode-uri": "^3.0.2"
+    "vscode-uri": "^3.0.3"
   }
 }

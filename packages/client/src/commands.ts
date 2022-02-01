@@ -1,4 +1,3 @@
-import { toUri } from 'common-utils/uriHelper.js';
 import {
     CodeAction,
     commands,
@@ -6,6 +5,7 @@ import {
     Diagnostic,
     Disposable,
     FileType,
+    Position,
     QuickPickItem,
     QuickPickOptions,
     Range,
@@ -23,12 +23,14 @@ import * as di from './di';
 import { extractMatchingDiagRanges, extractMatchingDiagTexts, getCSpellDiags } from './diags';
 import * as Settings from './settings';
 import {
+    ConfigFields,
     ConfigTargetLegacy,
     ConfigurationTarget,
     createConfigFileRelativeToDocumentUri,
     getSettingFromVSConfig,
     normalizeTarget,
     setEnableSpellChecking,
+    TargetsAndScopes,
     toggleEnableSpellChecker,
 } from './settings';
 import { ClientConfigTarget } from './settings/clientConfigTarget';
@@ -47,6 +49,7 @@ import {
     dictionaryTargetBestMatchesWorkspace,
     filterClientConfigTargets,
     matchKindAll,
+    matchScopeAll,
     MatchTargetsFn,
     patternMatchNoDictionaries,
     quickPickTarget,
@@ -54,10 +57,16 @@ import {
 import { normalizeWords } from './settings/CSpellSettings';
 import { createDictionaryTargetForFile, DictionaryTarget } from './settings/DictionaryTarget';
 import { mapConfigTargetToClientConfigTarget } from './settings/mappers/configTarget';
-import { configurationTargetToDictionaryScope, dictionaryScopeToConfigurationTarget } from './settings/targetAndScope';
+import {
+    configurationTargetToClientConfigScope,
+    configurationTargetToClientConfigScopeInfluenceRange,
+    configurationTargetToDictionaryScope,
+    dictionaryScopeToConfigurationTarget,
+} from './settings/targetAndScope';
 import { catchErrors, handleErrors, ignoreError, OnErrorResolver } from './util/errors';
 import { performance, toMilliseconds } from './util/perf';
 import { scrollToText } from './util/textEditor';
+import { toUri } from './util/uriHelper';
 import { findMatchingDocument } from './vscode/findDocument';
 
 const commandsFromServer: ClientSideCommandHandlerApi = {
@@ -79,7 +88,8 @@ type CommandHandler = {
 };
 
 const prompt = onCommandUseDiagsSelectionOrPrompt;
-const tfCfg = targetsFromConfigurationTarget;
+const tsFCfg = (configTarget: ConfigurationTarget, limitToTarget = false) =>
+    targetsAndScopeFromConfigurationTarget(configTarget, undefined, undefined, limitToTarget);
 const actionAddWordToFolder = prompt('Add Words to Folder Dictionary', addWordToFolderDictionary);
 const actionAddWordToWorkspace = prompt('Add Words to Workspace Dictionaries', addWordToWorkspaceDictionary);
 const actionAddWordToUser = prompt('Add Words to User Dictionary', addWordToUserDictionary);
@@ -130,12 +140,13 @@ const commandHandlers: CommandHandler = {
 
     'cSpell.enableLanguage': enableLanguageIdCmd,
     'cSpell.disableLanguage': disableLanguageIdCmd,
-    'cSpell.enableForGlobal': async () => setEnableSpellChecking(await tfCfg(ConfigurationTarget.Global), true),
-    'cSpell.disableForGlobal': async () => setEnableSpellChecking(await tfCfg(ConfigurationTarget.Global), false),
-    'cSpell.toggleEnableForGlobal': async () => toggleEnableSpellChecker(await tfCfg(ConfigurationTarget.Global)),
-    'cSpell.enableForWorkspace': async () => setEnableSpellChecking(await tfCfg(ConfigurationTarget.Workspace), true),
-    'cSpell.disableForWorkspace': async () => setEnableSpellChecking(await tfCfg(ConfigurationTarget.Workspace), false),
-    'cSpell.toggleEnableSpellChecker': async () => toggleEnableSpellChecker(await tfCfg(ConfigurationTarget.Workspace)),
+    'cSpell.enableForGlobal': async () => setEnableSpellChecking(await tsFCfg(ConfigurationTarget.Global), true),
+    'cSpell.disableForGlobal': async () => setEnableSpellChecking(await tsFCfg(ConfigurationTarget.Global), false),
+    'cSpell.toggleEnableForGlobal': async () => toggleEnableSpellChecker(await tsFCfg(ConfigurationTarget.Global, true)),
+    'cSpell.enableForWorkspace': async () => setEnableSpellChecking(await tsFCfg(ConfigurationTarget.Workspace), true),
+    'cSpell.disableForWorkspace': async () => setEnableSpellChecking(await tsFCfg(ConfigurationTarget.Workspace), false),
+    'cSpell.toggleEnableForWorkspace': async () => toggleEnableSpellChecker(await tsFCfg(ConfigurationTarget.Workspace)),
+    'cSpell.toggleEnableSpellChecker': async () => toggleEnableSpellChecker(await tsFCfg(ConfigurationTarget.Global)),
     'cSpell.enableCurrentLanguage': enableCurrentLanguage,
     'cSpell.disableCurrentLanguage': disableCurrentLanguage,
 
@@ -146,6 +157,8 @@ const commandHandlers: CommandHandler = {
     'cSpell.addIssuesToDictionary': addAllIssuesFromDocument,
     'cSpell.createCustomDictionary': createCustomDictionary,
     'cSpell.createCSpellConfig': createCSpellConfig,
+
+    'cSpell.openFileAtLine': openFileAtLine,
 };
 
 function pVoid<T>(p: Promise<T> | Thenable<T>, context: string, onErrorHandler: OnErrorResolver = ignoreError): Promise<void> {
@@ -331,7 +344,7 @@ export function enableDisableLanguageId(
     enable: boolean
 ): Promise<void> {
     return handleErrors(async () => {
-        const t = await (configTarget ? tfCfg(configTarget, uri) : targetsForUri(uri));
+        const t = await (configTarget ? targetsFromConfigurationTarget(configTarget, uri) : targetsForUri(uri));
         return Settings.enableLanguageIdForTarget(languageId, enable, t);
     }, ctx(`enableDisableLanguageId enable: ${enable}`, configTarget, uri));
 }
@@ -344,8 +357,12 @@ export function enableDisableLocale(
     enable: boolean
 ): Promise<void> {
     return handleErrors(async () => {
-        const t = await (configTarget ? tfCfg(configTarget, uri, configScope) : targetsForUri(uri));
-        return Settings.enableLocaleForTarget(locale, enable, t);
+        const { targets, scopes } = await targetsAndScopeFromConfigurationTarget(
+            configTarget || ConfigurationTarget.Global,
+            uri,
+            configScope
+        );
+        return Settings.enableLocaleForTarget(locale, enable, targets, scopes);
     }, ctx(`enableDisableLocale enable: ${enable}`, configTarget, uri));
 }
 
@@ -373,22 +390,34 @@ export function disableCurrentLanguage(): Promise<void> {
     }, 'disableCurrentLanguage');
 }
 
+async function targetsAndScopeFromConfigurationTarget(
+    cfgTarget: ConfigurationTarget,
+    docUri?: string | null | Uri | undefined,
+    configScope?: ConfigurationScope,
+    cfgTargetIsExact?: boolean
+): Promise<TargetsAndScopes> {
+    const scopes = cfgTargetIsExact
+        ? [configurationTargetToClientConfigScope(cfgTarget)]
+        : configurationTargetToClientConfigScopeInfluenceRange(cfgTarget);
+    const pattern = createConfigTargetMatchPattern(matchKindAll, matchScopeAll, { dictionary: false });
+
+    docUri = toUri(docUri);
+    const targets = await (docUri ? targetsForUri(docUri, pattern) : targetsForTextDocument(window.activeTextEditor?.document, pattern));
+    return {
+        targets: targets.map((t) => (t.kind === 'vscode' ? { ...t, configScope } : t)),
+        scopes,
+    };
+}
+
 async function targetsFromConfigurationTarget(
     cfgTarget: ConfigurationTarget,
     docUri?: string | null | Uri | undefined,
     configScope?: ConfigurationScope
 ): Promise<ClientConfigTarget[]> {
-    if (cfgTarget === ConfigurationTarget.Global) {
-        const uri = toUri(docUri || window.activeTextEditor?.document.uri);
-        const targets: ClientConfigTarget[] = [createClientConfigTargetVSCode(cfgTarget, uri, configScope)];
-        return targets;
-    }
-    const scope = configurationTargetToDictionaryScope(cfgTarget);
-    const pattern = createConfigTargetMatchPattern(matchKindAll, { dictionary: false }, scope, 'unknown');
-
-    docUri = toUri(docUri);
-    const targets = await (docUri ? targetsForUri(docUri, pattern) : targetsForTextDocument(window.activeTextEditor?.document, pattern));
-    return targets.map((t) => (t.kind === 'vscode' ? { ...t, configScope } : t));
+    const r = await targetsAndScopeFromConfigurationTarget(cfgTarget, docUri, configScope);
+    const { targets, scopes } = r;
+    const allowedScopes = new Set(scopes);
+    return targets.filter((t) => allowedScopes.has(t.scope));
 }
 
 async function targetsForTextDocument(
@@ -488,6 +517,11 @@ async function actionSuggestSpellingCorrections(): Promise<void> {
         return pVoid(window.showInformationMessage('Nothing to suggest.'), 'actionSuggestSpellingCorrections');
     }
 
+    const menu = getSettingFromVSConfig(ConfigFields.suggestionMenuType, document);
+    if (menu === 'quickFix') {
+        return await commands.executeCommand('editor.action.quickFix');
+    }
+
     const actions = await di.get('client').requestSpellingSuggestions(document, r, matchingDiags);
     if (!actions || !actions.length) {
         return pVoid(window.showInformationMessage(`No Suggestions Found for ${document.getText(r)}`), 'actionSuggestSpellingCorrections');
@@ -564,12 +598,26 @@ async function actionJumpToSpellingError(which: 'next' | 'previous', suggest: bo
     editor.selection = new Selection(range.start, range.end);
 
     if (suggest) {
-        type SuggestionMenu = 'quickPick' | 'quickFix';
-        const menu = getSettingFromVSConfig('suggestionMenuType', document);
-        if (menu === 'quickPick') {
-            await commands.executeCommand('cSpell.suggestSpellingCorrections');
-        } else if (menu === 'quickFix') {
-            await commands.executeCommand('editor.action.quickFix');
-        }
+        return actionSuggestSpellingCorrections();
     }
+}
+
+async function openFileAtLine(uri: string | Uri, line: number | undefined): Promise<void> {
+    uri = toUri(uri);
+
+    const options =
+        (line && {
+            selection: lineToRange(line),
+        }) ||
+        undefined;
+
+    await window.showTextDocument(uri, options);
+}
+
+function lineToRange(line: number | string | undefined) {
+    if (line === undefined) return undefined;
+    line = typeof line === 'string' ? Number.parseInt(line) : line;
+    const pos = new Position(line - 1, 0);
+    const range = new Range(pos, pos);
+    return range;
 }

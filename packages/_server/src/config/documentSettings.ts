@@ -9,7 +9,9 @@ import type {
     RegExpPatternDefinition,
 } from '@cspell/cspell-types';
 import { AutoLoadCache, createAutoLoadCache, createLazyValue, LazyValue } from 'common-utils/autoLoad.js';
+import { toUri } from 'common-utils/uriHelper.js';
 import { log } from 'common-utils/log.js';
+import { GitIgnore, findRepoRoot } from 'cspell-gitignore';
 import { GlobMatcher, GlobMatchRule, GlobPatternNormalized } from 'cspell-glob';
 import {
     calcOverrideSettings,
@@ -39,6 +41,7 @@ export interface SettingsCspell extends VSCodeSettingsCspell {}
 
 const cSpellSection: keyof SettingsCspell = extensionId;
 
+type FsPath = string;
 export interface SettingsVSCode {
     search?: {
         exclude?: ExcludeFilesGlobMap;
@@ -57,17 +60,34 @@ interface ExtSettings {
     includeGlobMatcher: GlobMatcher;
 }
 
+type PromiseType<T extends Promise<any>> = T extends Promise<infer R> ? R : never;
+type GitignoreResultP = ReturnType<GitIgnore['isIgnoredEx']>;
+type GitignoreResultInfo = PromiseType<GitignoreResultP>;
+
+export interface ExcludeIncludeIgnoreInfo {
+    include: boolean;
+    exclude: boolean;
+    ignored: boolean | undefined;
+    gitignoreInfo: GitignoreResultInfo | undefined;
+}
+
 const defaultExclude: Glob[] = [
     '**/*.rendered',
     '__pycache__/**', // ignore cache files. cspell:ignore pycache
 ];
 
-const defaultAllowedSchemes = ['gist', 'file', 'sftp', 'untitled'];
+const defaultAllowedSchemes = ['gist', 'file', 'sftp', 'untitled', 'vscode-notebook-cell'];
 const schemeBlockList = ['git', 'output', 'debug', 'vscode'];
 
 const defaultRootUri = Uri.file('').toString();
 
 const _defaultSettings: CSpellUserSettings = Object.freeze({});
+
+const _schemaMapToFile = {
+    'vscode-notebook-cell': true,
+} as const;
+
+const schemeMapToFile: Record<string, true> = Object.freeze(_schemaMapToFile);
 
 interface Clearable {
     clear: () => any;
@@ -75,13 +95,14 @@ interface Clearable {
 export class DocumentSettings {
     // Cache per folder settings
     private cachedValues: Clearable[] = [];
-    readonly getUriSettings = this.createCache((key: string = '') => this._getUriSettings(key));
     private readonly fetchSettingsForUri = this.createCache((key: string) => this._fetchSettingsForUri(key));
     private readonly fetchVSCodeConfiguration = this.createCache((key: string) => this._fetchVSCodeConfiguration(key));
+    private readonly fetchRepoRootForDir = this.createCache((dir: FsPath) => findRepoRoot(dir));
     private readonly _folders = this.createLazy(() => this.fetchFolders());
     readonly configsToImport = new Set<string>();
     private readonly importedSettings = this.createLazy(() => this._importSettings());
     private _version = 0;
+    private gitIgnore = new GitIgnore();
 
     constructor(readonly connection: Connection, readonly defaultSettings: CSpellUserSettings = _defaultSettings) {}
 
@@ -89,19 +110,64 @@ export class DocumentSettings {
         return this.getUriSettings(document.uri);
     }
 
-    _getUriSettings(uri: string): Promise<CSpellUserSettings> {
-        log('getUriSettings:', uri);
-        return this.fetchUriSettings(uri || '');
+    getUriSettings(uri: string): Promise<CSpellUserSettings> {
+        return this.fetchUriSettings(uri);
     }
 
-    async calcIncludeExclude(uri: Uri): Promise<{ include: boolean; exclude: boolean }> {
+    async calcIncludeExclude(uri: Uri): Promise<ExcludeIncludeIgnoreInfo> {
         const settings = await this.fetchSettingsForUri(uri.toString());
-        return calcIncludeExclude(settings, uri);
+        const ie = calcIncludeExclude(settings, uri);
+        const ignoredEx = await this._isGitIgnoredEx(settings, uri);
+        return {
+            ...ie,
+            ignored: ignoredEx?.matched,
+            gitignoreInfo: ignoredEx,
+        };
     }
 
     async isExcluded(uri: string): Promise<boolean> {
         const settings = await this.fetchSettingsForUri(uri);
-        return settings.excludeGlobMatcher.match(Uri.parse(uri).fsPath);
+        return isExcluded(settings, Uri.parse(uri));
+    }
+
+    /**
+     * If `useGitIgnore` is true, checks to see if a uri matches a `.gitignore` file glob.
+     * @param uri - file uri
+     * @returns `useGitignore` && the file matches a `.gitignore` file glob.
+     */
+    async isGitIgnored(uri: Uri): Promise<boolean | undefined> {
+        const extSettings = await this.fetchUriSettingsEx(uri.toString());
+        return this._isGitIgnored(extSettings, uri);
+    }
+
+    /**
+     * If `useGitIgnore` is true, checks to see if a uri matches a `.gitignore` file glob.
+     * @param uri - file uri
+     * @returns
+     *   - `undefined` if `useGitignore` is falsy. -- meaning we do not know.
+     *   - `true` if it is ignored
+     *   - `false` otherwise
+     */
+    private async _isGitIgnored(extSettings: ExtSettings, uri: Uri): Promise<boolean | undefined> {
+        if (!extSettings.settings.useGitignore) return undefined;
+        return await this.gitIgnore.isIgnored(uri.fsPath);
+    }
+
+    /**
+     * If `useGitIgnore` is true, checks to see if a uri matches a `.gitignore` file glob.
+     * @param uri - file uri
+     * @returns
+     *   - `undefined` if `useGitignore` is falsy. -- meaning we do not know.
+     *   - `true` if it is ignored
+     *   - `false` otherwise
+     */
+    private async _isGitIgnoredEx(extSettings: ExtSettings, uri: Uri): Promise<GitignoreResultInfo | undefined> {
+        if (!extSettings.settings.useGitignore) return undefined;
+        const root = await this.fetchRepoRootForFile(uri);
+        if (root) {
+            this.gitIgnore.addRoots([root]);
+        }
+        return await this.gitIgnore.isIgnoredEx(uri.fsPath);
     }
 
     async calcExcludedBy(uri: string): Promise<ExcludedByMatch[]> {
@@ -114,6 +180,7 @@ export class DocumentSettings {
         clearCachedFiles();
         this.cachedValues.forEach((cache) => cache.clear());
         this._version += 1;
+        this.gitIgnore = new GitIgnore();
     }
 
     get folders(): Promise<WorkspaceFolder[]> {
@@ -138,17 +205,12 @@ export class DocumentSettings {
     }
 
     private async fetchUriSettings(uri: string): Promise<CSpellUserSettings> {
-        log('Start fetchUriSettings:', uri);
         const exSettings = await this.fetchUriSettingsEx(uri);
-        log('Finish fetchUriSettings:', uri);
         return exSettings.settings;
     }
 
-    private async fetchUriSettingsEx(uri: string): Promise<ExtSettings> {
-        log('Start fetchUriSettingsEx:', uri);
-        const folderSettings = await this.fetchSettingsForUri(uri);
-        log('Finish fetchUriSettingsEx:', uri);
-        return folderSettings;
+    private fetchUriSettingsEx(uri: string): Promise<ExtSettings> {
+        return this.fetchSettingsForUri(uri);
     }
 
     private async findMatchingFolder(docUri: string, defaultTo: WorkspaceFolder): Promise<WorkspaceFolder>;
@@ -176,6 +238,12 @@ export class DocumentSettings {
         ).map((v) => v || {}) as [CSpellUserSettings, VsCodeSettings];
 
         return { cSpell, search };
+    }
+
+    private async fetchRepoRootForFile(uriFile: string | Uri) {
+        const u = toUri(uriFile);
+        const uriDir = UriUtils.dirname(u);
+        return this.fetchRepoRootForDir(uriDir.fsPath);
     }
 
     public async findCSpellConfigurationFilesForUri(docUri: string | Uri): Promise<Uri[]> {
@@ -216,6 +284,9 @@ export class DocumentSettings {
     private async _fetchSettingsForUri(docUri: string): Promise<ExtSettings> {
         log(`fetchFolderSettings: URI ${docUri}`);
         const uri = Uri.parse(docUri);
+        if (uri.scheme in schemeMapToFile) {
+            return this.fetchSettingsForUri(mapToFileUri(uri).toString());
+        }
         const fsPath = path.normalize(uri.fsPath);
         const cSpellConfigSettingsRel = await this.fetchSettingsFromVSCode(docUri);
         const cSpellConfigSettings = await this.resolveWorkspacePaths(cSpellConfigSettingsRel, docUri);
@@ -563,6 +634,14 @@ export function isIncluded(settings: ExtSettings, uri: Uri): boolean {
 
 export function isExcluded(settings: ExtSettings, uri: Uri): boolean {
     return settings.excludeGlobMatcher.match(uri.fsPath);
+}
+
+function mapToFileUri(uri: Uri): Uri {
+    return uri.with({
+        scheme: 'file',
+        query: '',
+        fragment: '',
+    });
 }
 
 export const __testing__ = {

@@ -1,13 +1,12 @@
 import { CSpellUserSettings } from '@cspell/cspell-types';
-import { mocked } from 'ts-jest/utils';
 import { ConfigurationTarget, Uri } from 'vscode';
 import { calculateConfigForTarget, updateConfig } from './vsConfig';
 import { createVSConfigReaderWriter } from './vsConfigReaderWriter';
 
 jest.mock('./vsConfig');
 
-const mockedUpdateConfig = mocked(updateConfig);
-const mockedCalculateConfigForTarget = mocked(calculateConfigForTarget);
+const mockedUpdateConfig = jest.mocked(updateConfig);
+const mockedCalculateConfigForTarget = jest.mocked(calculateConfigForTarget);
 
 describe('vsConfigReaderWriter', () => {
     test('createVSConfigReaderWriter', () => {
@@ -32,7 +31,7 @@ describe('vsConfigReaderWriter', () => {
 
     test('createVSConfigReaderWriter.update', async () => {
         const cfgData = {};
-        mockedUpdateConfig.mockImplementation(async (_t, _s, keys, fn) => {
+        mockedUpdateConfig.mockImplementation(async (_t, _s, _keys, fn) => {
             Object.assign(cfgData, fn(cfgData));
         });
         const rw = createVSConfigReaderWriter(ConfigurationTarget.Workspace, Uri.file(__filename), false);
@@ -46,7 +45,7 @@ describe('vsConfigReaderWriter', () => {
 
     test('createVSConfigReaderWriter.write', async () => {
         const cfgData = {};
-        mockedUpdateConfig.mockImplementation(async (_t, _s, keys, fn) => {
+        mockedUpdateConfig.mockImplementation(async (_t, _s, _keys, fn) => {
             Object.assign(cfgData, fn(cfgData));
         });
 

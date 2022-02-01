@@ -1,10 +1,10 @@
 // cSpell:ignore pycache
 
 import { log, logError, logger, logInfo, LogLevel, setWorkspaceBase, setWorkspaceFolders } from 'common-utils/log.js';
-import { toFileUri, toUri, uriToName } from 'common-utils/uriHelper.js';
+import { toFileUri, toUri } from 'common-utils/uriHelper.js';
 import * as CSpell from 'cspell-lib';
 import { CSpellSettingsWithSourceTrace, extractImportErrors, getDefaultSettings, Glob, refreshDictionaryCache } from 'cspell-lib';
-import { ReplaySubject, Subscription, timer } from 'rxjs';
+import { interval, ReplaySubject, Subscription } from 'rxjs';
 import { debounce, debounceTime, filter, mergeMap, take, tap } from 'rxjs/operators';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
@@ -40,6 +40,7 @@ import { TextDocumentUri, TextDocumentUriLangId } from './config/vscode.config';
 import { createProgressNotifier } from './progressNotifier';
 import { textToWords } from './utils';
 import { defaultIsTextLikelyMinifiedOptions, isTextLikelyMinified } from './utils/analysis';
+import { debounce as simpleDebounce } from './utils/debounce';
 import * as Validator from './validator';
 
 log('Starting Spell Checker Server');
@@ -81,7 +82,7 @@ export function run(): void {
     const dictionaryWatcher = new DictionaryWatcher();
     disposables.push(dictionaryWatcher);
 
-    const blockedFiles = new Set<string>();
+    const blockedFiles = new Map<string, Api.BlockedFileReason>();
 
     const configWatcher = new ConfigWatcher();
     disposables.push(configWatcher);
@@ -155,6 +156,7 @@ export function run(): void {
         log('updateActiveSettings');
         documentSettings.resetSettings();
         dictionaryWatcher.clear();
+        blockedFiles.clear();
         triggerValidateAll.next(undefined);
     }
 
@@ -163,9 +165,16 @@ export function run(): void {
     }
 
     function getActiveUriSettings(uri?: string) {
+        return _getActiveUriSettings(uri);
+    }
+
+    const _getActiveUriSettings = simpleDebounce(__getActiveUriSettings, 50);
+
+    function __getActiveUriSettings(uri?: string) {
         // Give the dictionaries a chance to refresh if they need to.
+        log('getActiveUriSettings', uri);
         refreshDictionaryCache(dictionaryRefreshRateMs);
-        return documentSettings.getUriSettings(uri);
+        return documentSettings.getUriSettings(uri || '');
     }
 
     function registerConfigurationFile([path]: [string]) {
@@ -193,20 +202,42 @@ export function run(): void {
     disposables.push(dictionaryWatcher.listen(onDictionaryChange));
     disposables.push(configWatcher.listen(onConfigFileChange));
 
-    function handleIsSpellCheckEnabled(params: TextDocumentInfo): Promise<Api.IsSpellCheckEnabledResult> {
-        return calcIncludeExcludeInfo(params);
+    async function handleIsSpellCheckEnabled(params: TextDocumentInfo): Promise<Api.IsSpellCheckEnabledResult> {
+        return _handleIsSpellCheckEnabled(params);
+    }
+
+    const _handleIsSpellCheckEnabled = simpleDebounce(
+        __handleIsSpellCheckEnabled,
+        50,
+        ({ uri, languageId }) => `(${uri})::(${languageId})`
+    );
+
+    async function __handleIsSpellCheckEnabled(params: TextDocumentInfo): Promise<Api.IsSpellCheckEnabledResult> {
+        log('handleIsSpellCheckEnabled', params.uri);
+        const activeSettings = await getActiveUriSettings(params.uri);
+        return calcIncludeExcludeInfo(activeSettings, params);
     }
 
     async function handleGetConfigurationForDocument(
         params: Api.GetConfigurationForDocumentRequest
     ): Promise<Api.GetConfigurationForDocumentResult> {
+        return _handleGetConfigurationForDocument(params);
+    }
+
+    const _handleGetConfigurationForDocument = simpleDebounce(__handleGetConfigurationForDocument, 50, (params) => JSON.stringify(params));
+
+    async function __handleGetConfigurationForDocument(
+        params: Api.GetConfigurationForDocumentRequest
+    ): Promise<Api.GetConfigurationForDocumentResult> {
+        log('handleGetConfigurationForDocument', params.uri);
         const { uri, workspaceConfig } = params;
         const doc = uri && documents.get(uri);
         const docSettings = stringifyPatterns((doc && (await getSettingsToUseForDocument(doc))) || undefined);
-        const settings = stringifyPatterns(await getActiveUriSettings(uri));
+        const activeSettings = await getActiveUriSettings(uri);
+        const settings = stringifyPatterns(activeSettings);
         const configFiles = uri ? (await documentSettings.findCSpellConfigurationFilesForUri(uri)).map((uri) => uri.toString()) : [];
         const configTargets = workspaceConfig ? calculateConfigTargets(settings, workspaceConfig) : [];
-        const ieInfo = await calcIncludeExcludeInfo(params);
+        const ieInfo = await calcIncludeExcludeInfo(activeSettings, params);
 
         return {
             configFiles,
@@ -259,46 +290,48 @@ export function run(): void {
 
     // validate documents
     const disposableValidate = validationRequestStream.pipe(filter((doc) => !validationByDoc.has(doc.uri))).subscribe((doc) => {
-        if (!validationByDoc.has(doc.uri)) {
-            const uri = doc.uri;
-            if (isUriBlocked(uri)) {
-                validationByDoc.set(
-                    doc.uri,
-                    validationRequestStream
-                        .pipe(
-                            filter((doc) => uri === doc.uri),
-                            take(1),
-                            tap((doc) => progressNotifier.emitSpellCheckDocumentStep(doc, 'ignore')),
-                            tap((doc) => log('Ignoring:', doc.uri))
-                        )
-                        .subscribe()
-                );
-            } else {
-                validationByDoc.set(
-                    doc.uri,
-                    validationRequestStream
-                        .pipe(
-                            filter((doc) => uri === doc.uri),
-                            tap((doc) => progressNotifier.emitSpellCheckDocumentStep(doc, 'start')),
-                            tap((doc) => log(`Request Validate: v${doc.version}`, doc.uri)),
-                            mergeMap(async (doc) => ({ doc, settings: await getActiveSettings(doc) } as DocSettingPair)),
-                            tap((dsp) => progressNotifier.emitSpellCheckDocumentStep(dsp.doc, 'settings determined')),
-                            debounce((dsp) =>
-                                timer(dsp.settings.spellCheckDelayMs || defaultDebounceMs).pipe(filter(() => !isValidationBusy))
-                            ),
-                            filter((dsp) => !blockValidation.has(dsp.doc.uri)),
-                            mergeMap(validateTextDocument)
-                        )
-                        .subscribe((diag) => connection.sendDiagnostics(diag))
-                );
-            }
+        if (validationByDoc.has(doc.uri)) return;
+        const uri = doc.uri;
+
+        if (isUriBlocked(uri)) {
+            validationByDoc.set(
+                doc.uri,
+                validationRequestStream
+                    .pipe(
+                        filter((doc) => uri === doc.uri),
+                        take(1),
+                        tap((doc) => progressNotifier.emitSpellCheckDocumentStep(doc, 'ignore')),
+                        tap((doc) => log('Ignoring:', doc.uri))
+                    )
+                    .subscribe()
+            );
+        } else {
+            validationByDoc.set(
+                doc.uri,
+                validationRequestStream
+                    .pipe(
+                        filter((doc) => uri === doc.uri),
+                        tap((doc) => progressNotifier.emitSpellCheckDocumentStep(doc, 'start')),
+                        tap((doc) => log(`Request Validate: v${doc.version}`, doc.uri)),
+                        debounceTime(defaultDebounceMs),
+                        mergeMap(async (doc) => ({ doc, settings: await getActiveSettings(doc) } as DocSettingPair)),
+                        tap((dsp) => progressNotifier.emitSpellCheckDocumentStep(dsp.doc, 'settings determined')),
+                        debounce((dsp) =>
+                            interval(dsp.settings.spellCheckDelayMs || defaultDebounceMs).pipe(filter(() => !isValidationBusy))
+                        ),
+                        filter((dsp) => !blockValidation.has(dsp.doc.uri)),
+                        mergeMap(validateTextDocument)
+                    )
+                    .subscribe((diag) => connection.sendDiagnostics(diag))
+            );
         }
     });
 
     const disposableTriggerUpdateConfigStream = triggerUpdateConfig
         .pipe(
             tap(() => log('Trigger Update Config')),
-            debounceTime(100)
+            debounceTime(100),
+            tap(() => log('Update Config Triggered'))
         )
         .subscribe(() => {
             updateActiveSettings();
@@ -323,19 +356,23 @@ export function run(): void {
         const { uri } = textDocument;
         const {
             blockCheckingWhenLineLengthGreaterThan = defaultIsTextLikelyMinifiedOptions.blockCheckingWhenLineLengthGreaterThan,
-            blockCheckingWhenAverageChunkSizeGreatherThan = defaultIsTextLikelyMinifiedOptions.blockCheckingWhenAverageChunkSizeGreatherThan,
+            blockCheckingWhenAverageChunkSizeGreaterThan = defaultIsTextLikelyMinifiedOptions.blockCheckingWhenAverageChunkSizeGreaterThan,
             blockCheckingWhenTextChunkSizeGreaterThan = defaultIsTextLikelyMinifiedOptions.blockCheckingWhenTextChunkSizeGreaterThan,
         } = settings;
-        if (blockedFiles.has(uri)) return true;
+        if (blockedFiles.has(uri)) {
+            log(`File is blocked ${blockedFiles.get(uri)?.message}`, uri);
+            return true;
+        }
         const isMiniReason = isTextLikelyMinified(textDocument.getText(), {
-            blockCheckingWhenAverageChunkSizeGreatherThan,
+            blockCheckingWhenAverageChunkSizeGreaterThan,
             blockCheckingWhenLineLengthGreaterThan,
             blockCheckingWhenTextChunkSizeGreaterThan,
         });
 
         if (isMiniReason) {
-            blockedFiles.add(uri);
-            connection.window.showInformationMessage(`File not spell checked:\n${isMiniReason}\n\"${uriToName(toUri(uri))}"`);
+            blockedFiles.set(uri, isMiniReason);
+            // connection.window.showInformationMessage(`File not spell checked:\n${isMiniReason}\n\"${uriToName(toUri(uri))}"`);
+            log(`File is blocked: ${isMiniReason.message}`, uri);
         }
 
         return !!isMiniReason;
@@ -346,13 +383,22 @@ export function run(): void {
         return enabledLanguageIds.indexOf(textDocument.languageId) >= 0;
     }
 
-    async function calcIncludeExcludeInfo(params: TextDocumentInfo): Promise<Api.IsSpellCheckEnabledResult> {
+    async function calcIncludeExcludeInfo(
+        settings: Api.CSpellUserSettings,
+        params: TextDocumentInfo
+    ): Promise<Api.IsSpellCheckEnabledResult> {
+        log('calcIncludeExcludeInfo', params.uri);
         const { uri, languageId } = params;
-        const settings = await getActiveUriSettings(uri);
         const languageEnabled = languageId && uri ? await isLanguageEnabled({ uri, languageId }, settings) : undefined;
 
-        const { include: fileIsIncluded = true, exclude: fileIsExcluded = false } = uri ? await calcFileIncludeExclude(uri) : {};
-        const fileEnabled = fileIsIncluded && !fileIsExcluded;
+        const {
+            include: fileIsIncluded = true,
+            exclude: fileIsExcluded = false,
+            ignored: gitignored = undefined,
+            gitignoreInfo = undefined,
+        } = uri ? await calcFileIncludeExclude(uri) : {};
+        const blockedReason = uri ? blockedFiles.get(uri) : undefined;
+        const fileEnabled = fileIsIncluded && !fileIsExcluded && !gitignored && !blockedReason;
         const excludedBy = fileIsExcluded && uri ? await getExcludedBy(uri) : undefined;
         return {
             excludedBy,
@@ -360,12 +406,15 @@ export function run(): void {
             fileIsExcluded,
             fileIsIncluded,
             languageEnabled,
+            gitignored,
+            gitignoreInfo,
+            blockedReason: uri ? blockedFiles.get(uri) : undefined,
         };
     }
 
-    async function isUriExcluded(uri: string) {
+    async function isUriExcluded(uri: string): Promise<boolean> {
         const ie = await calcFileIncludeExclude(uri);
-        return !ie.include || ie.exclude;
+        return !ie.include || ie.exclude || !!ie.ignored;
     }
 
     function calcFileIncludeExclude(uri: string) {

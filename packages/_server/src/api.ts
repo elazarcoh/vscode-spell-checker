@@ -127,12 +127,23 @@ export interface ExcludeRef {
     configUri: string | undefined;
 }
 
+export interface GitignoreInfo {
+    gitIgnoreFile: string;
+    glob: string | undefined;
+    line: number | undefined;
+    matched: boolean;
+    root: string | undefined;
+}
+
 export interface IsSpellCheckEnabledResult {
     languageEnabled: boolean | undefined;
     fileEnabled: boolean;
     fileIsIncluded: boolean;
     fileIsExcluded: boolean;
     excludedBy: ExcludeRef[] | undefined;
+    gitignored: boolean | undefined;
+    gitignoreInfo: GitignoreInfo | undefined;
+    blockedReason: BlockedFileReason | undefined;
 }
 
 export interface SplitTextIntoWordsResult {
@@ -289,3 +300,9 @@ export type ApiHandlers<ApiReqRes> = {
 export type ApiReqResMethods<ApiReqRes> = {
     [M in keyof ApiReqRes]: ApiReqResFn<ApiReqRes[M]>;
 };
+
+export interface BlockedFileReason {
+    code: string;
+    message: string;
+    documentationRefUri?: UriString;
+}

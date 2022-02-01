@@ -59,6 +59,21 @@ export interface ExcludeRef {
     configUri?: string | undefined;
 }
 
+export interface GitignoreInfo {
+    gitignoreFileUri: string;
+    gitignoreName: string;
+    glob: string | undefined;
+    line: number | undefined;
+    matched: boolean;
+    root: string | undefined;
+}
+
+export interface BlockedFileReason {
+    code: string;
+    message: string;
+    documentationRefUri?: string;
+}
+
 export interface IsSpellCheckEnabledResult {
     languageEnabled?: boolean | undefined;
     fileEnabled: boolean;
@@ -66,6 +81,8 @@ export interface IsSpellCheckEnabledResult {
     fileIsExcluded: boolean;
     fileIsInWorkspace: boolean;
     excludedBy?: ExcludeRef[] | undefined;
+    gitignoreInfo: GitignoreInfo | undefined;
+    blockedReason: BlockedFileReason | undefined;
 }
 
 export interface ConfigFile {

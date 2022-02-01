@@ -1,13 +1,7 @@
 # Custom Dictionary Words
-disqus
-Disqus
-gtag
-jemoji
-mademistakes
-michaelrose
-msvalidate
-naver
-Naver
-staticman
-Staticman
-staticmanapp
+mswin
+pmarsceill
+streetsidesoftware
+VSIX
+webrick
+zoneinfo

@@ -6,23 +6,19 @@ The goal of this spell checker is to help catch common spelling errors while kee
 
 ## Support Further Development
 
--   Become a [<img src="https://raw.githubusercontent.com/streetsidesoftware/vscode-spell-checker/main/images/patreon/Digital-Patreon-Logo_FieryCoral_16x16.png" alt="Patreon"> Patreon!](https://patreon.com/streetsidesoftware)
+-   Become a [![Patreon](https://raw.githubusercontent.com/streetsidesoftware/vscode-spell-checker/main/images/patreon/Digital-Patreon-Logo_FieryCoral_16x16.png) Patreon!](https://patreon.com/streetsidesoftware)
+
+-   [Support through ![PayPal](https://raw.githubusercontent.com/streetsidesoftware/vscode-spell-checker/main/images/PayPal/paypal-logo-wide-18.png)](https://www.paypal.com/donate/?hosted_button_id=26LNBP2Q6MKCY)
+-   [Open Collective](https://opencollective.com/code-spell-checker)
 
 ## Sponsors
 
-<p>
-    <a  title="Try CodeStream"
-        href="https://sponsorlink.codestream.com/?utm_source=vscmarket&amp;utm_campaign=codespellchecker&amp;utm_medium=banner">
-        <img src="https://alt-images.codestream.com/codestream_logo_codespellchecker.png">
-    </a></br>
-    Manage pull requests and conduct code reviews in your IDE with full source-tree context.
-    Comment on any line, not just the diffs. Use jump-to-definition, your favorite keybindings,
-    and code intelligence with more of your workflow.<br>
-    <a  title="Try CodeStream"
-        href="https://sponsorlink.codestream.com/?utm_source=vscmarket&amp;utm_campaign=codespellchecker&amp;utm_medium=banner">
-        Learn More
-    </a>
-</p>
+[![CodeStream Logo](https://alt-images.codestream.com/codestream_logo_codespellchecker.png)](https://sponsorlink.codestream.com/?utm_source=vscmarket&utm_campaign=codespellchecker&utm_medium=banner 'Try CodeStream')
+
+Manage pull requests and conduct code reviews in your IDE with full source-tree context.
+Comment on any line, not just the diffs. Use jump-to-definition, your favorite keybindings,
+and code intelligence with more of your workflow.<br>
+[Learn More](https://sponsorlink.codestream.com/?utm_source=vscmarket&utm_campaign=codespellchecker&utm_medium=banner 'Try CodeStream')
 
 ## Functionality
 
@@ -93,7 +89,7 @@ Open up VS Code and hit `F1` and type `ext` select install and type `code-spell-
 -   Java
 -   JavaScript
 -   JSON / JSONC
--   LaTex
+-   LaTeX
 -   Markdown
 -   PHP
 -   PowerShell
@@ -287,7 +283,7 @@ In general you should not need to use `includeRegExp`. But if you are mixing lan
 
 ```Python
 # cSpell:includeRegExp #.*
-# cSpell:includeRegExp ("""|''')[^\1]*\1
+# cSpell:includeRegExp /(["]{3}|[']{3})[^\1]*?\1/g
 # only comments and block strings will be checked for spelling.
 def sum_it(self, seq):
     """This is checked for spelling"""
@@ -346,8 +342,8 @@ Note, the settings in `cspell.json` will override the equivalent cSpell settings
 ```javascript
 // cSpell Settings
 {
-    // Version of the setting file.  Always 0.1
-    "version": "0.1",
+    // Version of the setting file.  Always 0.2
+    "version": "0.2",
     // language - current active spelling language
     "language": "en",
     // words - list of words to be always considered correct

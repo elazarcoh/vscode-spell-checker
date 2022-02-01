@@ -3,6 +3,7 @@ import ListItem from '@material-ui/core/ListItem';
 import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemSecondaryAction from '@material-ui/core/ListItemSecondaryAction';
 import ListItemText from '@material-ui/core/ListItemText';
+import Link from '@material-ui/core/Link';
 import MenuItem from '@material-ui/core/MenuItem';
 import Select from '@material-ui/core/Select';
 import IconCode from '@material-ui/icons/Code';
@@ -96,8 +97,8 @@ export class PanelFile extends React.Component<{ appState: AppState }> {
     }
 }
 
-function* br(frags: React.ReactFragment[] | undefined) {
-    if (!frags) return;
+function* br(...frags: React.ReactFragment[]) {
+    if (!frags.length) return;
     let index = 0;
     for (const f of frags) {
         if (index++) {
@@ -114,28 +115,62 @@ function isDefined<T>(t: T | undefined): t is T {
 function secondaryFileMessage(config: FileConfig | undefined): React.ReactFragment | undefined {
     if (!config) return undefined;
 
-    const { fileIsInWorkspace, fileIsExcluded, fileIsIncluded, fileEnabled } = config;
+    const { fileIsInWorkspace, fileIsExcluded, fileIsIncluded, fileEnabled, gitignoreInfo, blockedReason } = config;
+    const gitignored = !!gitignoreInfo?.matched;
 
-    const excludedBy = config.excludedBy
-        ?.map((e) => e.configUri && LinkOpenFile({ uri: e.configUri, text: e.name ? `${e.name} - "${e.glob}"` : `"${e.glob}"` } || '*'))
+    const excludedBy =
+        config.excludedBy
+            ?.map((e) => e.configUri && LinkOpenFile({ uri: e.configUri, text: e.name ? `${e.name} - "${e.glob}"` : `"${e.glob}"` } || '*'))
+            .filter(isDefined) ?? [];
+
+    const linkGitignore = formatGitignoreLink(gitignoreInfo);
+
+    const messages = [
+        [formatGitignoreMsg(gitignoreInfo), gitignored],
+        [formatBlockedMsg(blockedReason), !!blockedReason],
+        [linkGitignore, gitignored],
+        ['File is excluded', fileIsInWorkspace && fileIsIncluded && fileIsExcluded],
+        ['File is NOT in `files` to be checked.', fileIsInWorkspace && !fileIsIncluded],
+        ['File is NOT in the workspace and excluded.', !fileIsInWorkspace && fileIsExcluded],
+        ['File is NOT in the workspace.', !fileIsInWorkspace && !fileIsExcluded && fileEnabled],
+        ['File is NOT spell checked because it is not in the workspace.', !fileIsInWorkspace && !fileIsExcluded && !fileEnabled],
+    ] as const;
+
+    const msg = messages
+        .filter(([_, m]) => m)
+        .map(([m]) => m)
         .filter(isDefined);
+    return msg ? <div>{[...br(...msg, ...excludedBy)]}</div> : undefined;
+}
 
-    const msg = fileIsInWorkspace
-        ? fileIsIncluded
-            ? fileIsExcluded
-                ? 'File is excluded.'
-                : undefined
-            : 'File in NOT in `files` to be checked.'
-        : fileIsExcluded
-        ? 'File is NOT in the workspace and excluded.'
-        : fileEnabled
-        ? 'File is NOT in the workspace.'
-        : 'File is NOT spell checked because it is not in the workspace.';
-    return msg ? (
-        <div>
-            {msg}
-            <br />
-            {[...br(excludedBy)]}
-        </div>
-    ) : undefined;
+function formatGitignoreLink(gitignore: FileConfig['gitignoreInfo']) {
+    if (!gitignore) return undefined;
+
+    const { gitignoreFileUri: uri, gitignoreName: name, line } = gitignore;
+
+    return LinkOpenFile({ uri: uri, text: name, line });
+}
+
+function formatGitignoreMsg(gitignore: FileConfig['gitignoreInfo']) {
+    if (!gitignore) return undefined;
+
+    const { line, glob } = gitignore;
+
+    return (
+        <span>
+            File is exclude by <b>.gitignore</b>. Line: <b>{line}</b>, Glob: <b>{glob}</b>
+        </span>
+    );
+}
+
+function formatBlockedMsg(blockedReason: FileConfig['blockedReason']) {
+    if (!blockedReason) return undefined;
+
+    const { message, documentationRefUri } = blockedReason;
+
+    return (
+        <span>
+            {message} {documentationRefUri ? <Link href={documentationRefUri}>More Info...</Link> : undefined}
+        </span>
+    );
 }

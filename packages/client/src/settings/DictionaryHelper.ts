@@ -16,7 +16,7 @@ import type {
 } from '../client';
 import { scrollToText } from '../util/textEditor';
 import { ClientConfigTarget } from './clientConfigTarget';
-import { ConfigKeysByField } from './configFields';
+import { ConfigFields } from './configFields';
 import { ConfigRepository, CSpellConfigRepository, VSCodeRepository } from './configRepository';
 import { dictionaryTargetBestMatches, MatchTargetsFn } from './configTargetHelper';
 import { configUpdaterForKeys } from './configUpdater';
@@ -80,7 +80,7 @@ export class DictionaryHelper {
         try {
             await dictTarget.addWords(words);
         } catch (e) {
-            throw new UnableToAddWordError(`Unable to add "${words}"`, dictTarget, words);
+            throw new UnableToAddWordError(`Unable to add "${words}"`, dictTarget, words, e);
         }
     }
 
@@ -133,9 +133,9 @@ export class DictionaryHelper {
     public async removeWordFromDictionary(words: string | string[], dictTarget: DictionaryTarget): Promise<void> {
         words = normalizeWords(words);
         try {
-            await dictTarget.addWords(words);
+            await dictTarget.removeWords(words);
         } catch (e) {
-            throw new DictionaryTargetError(`Unable to remove "${words}" from "${dictTarget.name}"`, dictTarget);
+            throw new DictionaryTargetError(`Unable to remove "${words}" from "${dictTarget.name}"`, dictTarget, e);
         }
     }
 
@@ -294,7 +294,7 @@ async function addCustomDictionaryToConfig(cfgRep: ConfigRepository, def: Dictio
 
 function updaterForCustomDictionaryToConfigCSpell(def: DictionaryDefinitionCustom) {
     const name = def.name;
-    return configUpdaterForKeys([ConfigKeysByField.dictionaries, ConfigKeysByField.dictionaryDefinitions], (cfg) => {
+    return configUpdaterForKeys([ConfigFields.dictionaries, ConfigFields.dictionaryDefinitions], (cfg) => {
         const { dictionaries = [], dictionaryDefinitions = [] } = cfg;
         const defsByName = new Map(dictionaryDefinitions.map((d) => [d.name, d]));
         const dictNames = new Set(dictionaries);
@@ -313,10 +313,10 @@ function updaterForCustomDictionaryToConfigVSCode(def: DictionaryDefinitionCusto
     const name = def.name;
     return configUpdaterForKeys(
         [
-            ConfigKeysByField.customDictionaries,
-            ConfigKeysByField.customFolderDictionaries,
-            ConfigKeysByField.customWorkspaceDictionaries,
-            ConfigKeysByField.customUserDictionaries,
+            ConfigFields.customDictionaries,
+            ConfigFields.customFolderDictionaries,
+            ConfigFields.customWorkspaceDictionaries,
+            ConfigFields.customUserDictionaries,
         ],
         (cfg) => {
             const { customDictionaries, ...rest } = combineCustomDictionaries(cfg);
@@ -375,14 +375,14 @@ function combineDictionaryEntry(c: CustomDictionaries, entry: CustomDictionaryEn
 }
 
 export class DictionaryTargetError extends Error {
-    constructor(msg: string, readonly dictTarget: DictionaryTarget) {
+    constructor(msg: string, readonly dictTarget: DictionaryTarget, readonly cause: Error | unknown) {
         super(msg);
     }
 }
 
 export class UnableToAddWordError extends DictionaryTargetError {
-    constructor(msg: string, dictTarget: DictionaryTarget, readonly words: string | string[]) {
-        super(msg, dictTarget);
+    constructor(msg: string, dictTarget: DictionaryTarget, readonly words: string | string[], readonly cause: Error | unknown) {
+        super(msg, dictTarget, cause);
     }
 }
 

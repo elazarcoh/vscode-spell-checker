@@ -3,12 +3,13 @@
 import type {
     CSpellSettings,
     CustomDictionaryScope,
+    DictionaryDefinitionCustom,
+    DictionaryDefinitionPreferred,
+    LanguageSetting,
+    OverrideSettings,
     DictionaryId,
     FsPath,
     GlobDef,
-    Pattern,
-    PatternId,
-    RegExpPatternDefinition,
     SimpleGlob,
 } from '@cspell/cspell-types';
 export type {
@@ -41,8 +42,14 @@ export interface SpellCheckerSettings extends SpellCheckerShouldCheckDocSettings
 
     /**
      * Control which file schemas will be checked for spelling (VS Code must be restarted for this setting to take effect).
+     * @markdownDescription
+     * Control which file schemas will be checked for spelling (VS Code must be restarted for this setting to take effect).
+     *
+     * Some schemas have special meaning like:
+     * - `untitled` - Used for new documents that have not yet been saved
+     * - `vscode-notebook-cell` - Used for validating segments of a Notebook.
      * @scope window
-     * @default ["file", "gist", "sftp", "untitled"]
+     * @default ["file", "gist", "sftp", "untitled", "vscode-notebook-cell"]
      */
     allowedSchemas?: string[];
 
@@ -76,6 +83,16 @@ export interface SpellCheckerSettings extends SpellCheckerShouldCheckDocSettings
      *  "Right Side of Statusbar"]
      */
     showStatusAlignment?: 'Left' | 'Right';
+
+    /**
+     * Show CSpell in-document directives as you type.
+     * @markdownDescription
+     * Show CSpell in-document directives as you type.
+     * **Note:** VS Code must be restarted for this setting to take effect.
+     * @scope language-overridable
+     * @default false
+     */
+    showAutocompleteSuggestions?: boolean;
 
     /**
      * Delay in ms after a document has changed before checking it for spelling errors.
@@ -137,7 +154,7 @@ export interface SpellCheckerSettings extends SpellCheckerShouldCheckDocSettings
      * @markdownDescription
      * Define custom dictionaries to be included by default for the user.
      * If `addWords` is `true` words will be added to this dictionary.
-     * @deprecated
+     * @deprecated true
      * @deprecationMessage - Use `customDictionaries` instead.
      */
     customUserDictionaries?: CustomDictionaryEntry[];
@@ -148,7 +165,7 @@ export interface SpellCheckerSettings extends SpellCheckerShouldCheckDocSettings
      * @markdownDescription
      * Define custom dictionaries to be included by default for the workspace.
      * If `addWords` is `true` words will be added to this dictionary.
-     * @deprecated
+     * @deprecated true
      * @deprecationMessage - Use `customDictionaries` instead.
      */
     customWorkspaceDictionaries?: CustomDictionaryEntry[];
@@ -159,7 +176,7 @@ export interface SpellCheckerSettings extends SpellCheckerShouldCheckDocSettings
      * @markdownDescription
      * Define custom dictionaries to be included by default for the folder.
      * If `addWords` is `true` words will be added to this dictionary.
-     * @deprecated
+     * @deprecated true
      * @deprecationMessage - Use `customDictionaries` instead.
      */
     customFolderDictionaries?: CustomDictionaryEntry[];
@@ -168,19 +185,21 @@ export interface SpellCheckerSettings extends SpellCheckerShouldCheckDocSettings
      * @title Custom Dictionaries
      * @scope resource
      * @markdownDescription
-     * Define custom dictionaries to be included by default for the folder.
+     * Define custom dictionaries to be included by default.
      * If `addWords` is `true` words will be added to this dictionary.
      *
      * **Example:**
      *
      * ```js
-     * customDictionaries: {
+     * "cSpell.customDictionaries": {
      *   "project-words": {
      *     "name": "project-words",
      *     "path": "${workspaceRoot}/project-words.txt",
      *     "description": "Words used in this project",
      *     "addWords": true
-     *   }
+     *   },
+     *   "custom": true, // Enable the `custom` dictionary
+     *   "internal-terms": false // Disable the `internal-terms` dictionary
      * }
      * ```
      */
@@ -196,9 +215,20 @@ export interface SpellCheckerSettings extends SpellCheckerShouldCheckDocSettings
      * ```
      * "cSpell.files": ["**", "**​/.*", "**​/.*​/**"]
      * ```
-     * @default true
+     * @default false
      */
     spellCheckOnlyWorkspaceFiles?: boolean;
+
+    /**
+     * @scope resource
+     * @markdownDescription
+     * The type of menu used to display spelling suggestions.
+     * @default "quickPick"
+     * @enumDescriptions [
+     *  "Suggestions will appear as a drop down at the top of the IDE. (Best choice for Vim Key Bindings)",
+     *  "Suggestions will appear inline near the word, inside the text editor."]
+     */
+    suggestionMenuType?: 'quickPick' | 'quickFix';
 
     /**
      * Show Regular Expression Explorer
@@ -234,25 +264,52 @@ type EnableFileTypeId = string;
 
 interface SpellCheckerShouldCheckDocSettings {
     /**
-     * The maximum line length
-     * @scope resource
-     * @default 1000
+     * @markdownDescription
+     * The maximum line length.
+     *
+     * Block spell checking if lines are longer than the value given.
+     * This is used to prevent spell checking generated files.
+     *
+     * **Error Message:** _Lines are too long._
+     *
+     * @scope language-overridable
+     * @default 10000
      */
     blockCheckingWhenLineLengthGreaterThan?: number;
     /**
-     * The maximum size of text chunks
-     * @scope resource
-     * @default 200
+     * @markdownDescription
+     * The maximum length of a chunk of text without word breaks.
+     *
+     * It is used to prevent spell checking of generated files.
+     *
+     * A chunk is the characters between absolute word breaks.
+     * Absolute word breaks match: `/[\s,{}[\]]/`, i.e. spaces or braces.
+     *
+     * **Error Message:** _Maximum Word Length is Too High._
+     *
+     * If you are seeing this message, it means that the file contains a very long line
+     * without many word breaks.
+     *
+     * @scope language-overridable
+     * @default 500
      */
     blockCheckingWhenTextChunkSizeGreaterThan?: number;
     /**
-     * The maximum average chunk of text size.
+     * @markdownDescription
+     * The maximum average length of chunks of text without word breaks.
+     *
      * A chunk is the characters between absolute word breaks.
      * Absolute word breaks match: `/[\s,{}[\]]/`
-     * @scope resource
-     * @default 40
+     *
+     * **Error Message:** _Average Word Size is Too High._
+     *
+     * If you are seeing this message, it means that the file contains mostly long lines
+     * without many word breaks.
+     *
+     * @scope language-overridable
+     * @default 80
      */
-    blockCheckingWhenAverageChunkSizeGreatherThan?: number;
+    blockCheckingWhenAverageChunkSizeGreaterThan?: number;
 }
 
 export type CustomDictionaries = {
@@ -398,6 +455,18 @@ interface CSpellSettingsPackageProperties extends CSpellSettings {
 
     /**
      * @scope resource
+     * @default 3
+     */
+    suggestionNumChanges?: CSpellSettings['suggestionNumChanges'];
+
+    /**
+     * @scope resource
+     * @default 400
+     */
+    suggestionsTimeout?: CSpellSettings['suggestionsTimeout'];
+
+    /**
+     * @scope resource
      * @default 4
      */
     minWordLength?: number;
@@ -434,6 +503,7 @@ interface CSpellSettingsPackageProperties extends CSpellSettings {
      *       "javascriptreact",
      *       "json",
      *       "jsonc",
+     *       "jupyter",
      *       "latex",
      *       "less",
      *       "markdown",
@@ -445,9 +515,11 @@ interface CSpellSettingsPackageProperties extends CSpellSettings {
      *       "rust",
      *       "scala",
      *       "scss",
+     *       "swift",
      *       "text",
      *       "typescript",
      *       "typescriptreact",
+     *       "vue",
      *       "yaml",
      *       "yml"
      *     ]
@@ -518,7 +590,7 @@ interface CSpellSettingsPackageProperties extends CSpellSettings {
     /**
      * @scope resource
      */
-    patterns?: RegExpPatternDefinitionX[];
+    patterns?: CSpellSettings['patterns'];
 
     /**
      * @scope resource
@@ -581,6 +653,19 @@ interface CSpellSettingsPackageProperties extends CSpellSettings {
     noConfigSearch?: CSpellSettings['noConfigSearch'];
 
     /**
+     * @scope window
+     * @default true
+     */
+    useGitignore?: CSpellSettings['useGitignore'];
+
+    /**
+     * Hide this for now.
+     * Need to resolve the roots and support substitution of workspace paths.
+     * @hidden
+     */
+    gitignoreRoot?: CSpellSettings['gitignoreRoot'];
+
+    /**
      * @hidden
      */
     pnpFiles?: CSpellSettings['pnpFiles'];
@@ -599,43 +684,12 @@ interface CSpellSettingsPackageProperties extends CSpellSettings {
      * @scope resource
      */
     noSuggestDictionaries?: CSpellSettings['noSuggestDictionaries'];
-
-    /**
-     * @scope resource
-     * @description Which menu type is used for suggestions.
-     * @default "quickPick"
-     * @enumDescriptions [
-     *  "Suggestions will appear in the suggestion bar at the IDE top",
-     *  "Suggestions will appear near the word, inside the text editor"]
-     */
-    suggestionMenuType?: 'quickPick' | 'quickFix';
 }
 
 /**
  * @hidden
  */
 type GlobDefX = GlobDef;
-
-/**
- * @hidden
- */
-type HiddenPatterns = Pattern[];
-
-interface RegExpPatternDefinitionX extends RegExpPatternDefinition {
-    /**
-     * Pattern name, used as an identifier in ignoreRegExpList and includeRegExpList.
-     * It is possible to redefine one of the predefined patterns to override its value.
-     */
-    name: PatternId;
-    /**
-     * RegExp pattern or array of RegExp patterns
-     */
-    pattern: Pattern | HiddenPatterns;
-    /**
-     * Description of the pattern.
-     */
-    description?: string;
-}
 
 export interface CustomDictionaryWithScope extends CustomDictionary {}
 
@@ -650,9 +704,61 @@ type Prefix<T, P extends string> = {
     [Property in keyof T as `${P}${AsString<string & Property>}`]: T[Property];
 };
 
-type CSpellOmitFieldsFromPackageJson = '$schema' | 'description' | 'id' | 'name' | 'version' | 'languageId' | 'pnpFiles' | 'readonly';
+type DictionaryDef =
+    | Omit<DictionaryDefinitionPreferred, 'type' | 'useCompounds' | 'repMap'>
+    | Omit<DictionaryDefinitionCustom, 'type' | 'useCompounds' | 'repMap'>;
 
-export type SpellCheckerSettingsVSCodeBase = Omit<CSpellUserSettings, CSpellOmitFieldsFromPackageJson>;
+interface DictionaryDefinitions {
+    /**
+     * Define additional available dictionaries.
+     * @scope resource
+     */
+    dictionaryDefinitions?: DictionaryDef[];
+}
+
+type LanguageSettingsReduced = Omit<LanguageSetting, 'local' | 'dictionaryDefinitions'> & DictionaryDefinitions;
+
+interface LanguageSettings {
+    /**
+     * Additional settings for individual programming languages and locales.
+     * @scope resource
+     */
+    languageSettings?: LanguageSettingsReduced[];
+}
+
+type OverridesReduced = Omit<OverrideSettings, 'dictionaryDefinitions' | 'languageSettings'> & DictionaryDefinitions & LanguageSettings;
+interface Overrides {
+    /**
+     * Overrides to apply based upon the file path.
+     * @scope resource
+     */
+    overrides?: OverridesReduced[];
+}
+
+type CSpellOmitFieldsFromExtensionContributesInPackageJson =
+    | '$schema'
+    | 'cache'
+    | 'description'
+    | 'enableGlobDot' // Might add this later
+    | 'features' // add this back when they are in use.
+    | 'gitignoreRoot' // Hide until implemented
+    | 'failFast'
+    | 'id'
+    | 'languageId'
+    | 'name'
+    | 'pnpFiles'
+    | 'readonly'
+    | 'reporters'
+    | 'version';
+
+export interface SpellCheckerSettingsVSCodeBase
+    extends Omit<
+            CSpellUserSettings,
+            CSpellOmitFieldsFromExtensionContributesInPackageJson | 'dictionaryDefinitions' | 'languageSettings' | 'overrides'
+        >,
+        DictionaryDefinitions,
+        LanguageSettings,
+        Overrides {}
 
 export type SpellCheckerSettingsVSCodeProperties = Prefix<SpellCheckerSettingsVSCodeBase, 'cSpell.'>;
 

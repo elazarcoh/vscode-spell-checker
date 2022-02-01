@@ -20,23 +20,37 @@ jobs:
       REF_BRANCH: main
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v2.4.0
         with:
           ref: ${{ env.REF_BRANCH }}
       - name: Update
-        run: yarn upgrade
+        run: |
+          yarn
+          yarn upgrade
+          yarn package-json-dependency-updater --update
+          yarn
       - name: Has changes
         run: |
           git --no-pager diff --compact-summary  --exit-code && echo "git_status=clean" >> $GITHUB_ENV || echo "git_status=dirty" >> $GITHUB_ENV
           git --no-pager diff --compact-summary
       - name: Gen Body
         run: |
-          echo 'git_body<<DIFF' >> $GITHUB_ENV
-          git --no-pager diff --compact-summary >> $GITHUB_ENV
-          echo 'DIFF' >> $GITHUB_ENV
+          echo "git_body<<DIFF" >> $GITHUB_ENV
+          echo "### Workflow Bot -- Update ALL Dependencies" >> $GITHUB_ENV
+          echo "" >> $GITHUB_ENV
+          echo "#### Package.json"  >> $GITHUB_ENV
+          echo "" >> $GITHUB_ENV
+          echo "\`\`\`\`\`\`diff"  >> $GITHUB_ENV
+          git --no-pager diff package.json  >> $GITHUB_ENV
+          echo "\`\`\`\`\`\`"  >> $GITHUB_ENV
+          echo "" >> $GITHUB_ENV
+          echo "#### Summary"  >> $GITHUB_ENV
+          echo "" >> $GITHUB_ENV
+          git --no-pager diff --stat  >> $GITHUB_ENV
+          echo "DIFF" >> $GITHUB_ENV
       - name: Echo git_status
         run: echo ${{ env.git_status }}
-      - uses: tibdex/github-app-token@v1.4 # cspell:ignore tibdex
+      - uses: tibdex/github-app-token@v1.5 # cspell:ignore tibdex
         if: env.git_status == 'dirty'
         id: generate-token
         with:
@@ -44,7 +58,7 @@ jobs:
           private_key: ${{ secrets.AUTOMATION_PRIVATE_KEY }}
       - name: Create Pull Request
         if: env.git_status == 'dirty'
-        uses: peter-evans/create-pull-request@v3.10.1
+        uses: peter-evans/create-pull-request@v3.12.1
         with:
           commit-message: "ci: Workflow Bot -- Update ALL Dependencies"
           branch: ${{ env.NEW_BRANCH }}

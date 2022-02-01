@@ -24,6 +24,7 @@ import { Inspect, inspectConfigKeys, sectionCSpell } from '../settings';
 import * as LanguageIds from '../settings/languageIds';
 import { Maybe } from '../util';
 import { createBroadcaster } from '../util/broadcaster';
+import { findConicalDocumentScope } from '../util/documentUri';
 import { logErrors, silenceErrors } from '../util/errors';
 import {
     createServerApi,
@@ -62,7 +63,6 @@ export class CSpellClient implements Disposable {
     private serverApi: ServerApi;
     private disposables: Set<Disposable> = new Set();
     private broadcasterOnSpellCheckDocument = createBroadcaster<OnSpellCheckDocumentStep>();
-    private initComplete: Promise<void>;
 
     /**
      * @param: {string} module -- absolute path to the server module.
@@ -109,7 +109,7 @@ export class CSpellClient implements Disposable {
         this.client = new LanguageClient('cspell', 'Code Spell Checker', serverOptions, clientOptions);
         this.client.registerProposedFeatures();
         this.serverApi = createServerApi(this.client);
-        this.initComplete = this.initWhenReady();
+        this.initWhenReady().catch((e) => console.error(e));
     }
 
     public needsStart(): boolean {
@@ -248,9 +248,10 @@ function handleOnWorkspaceConfigForDocumentRequest(req: WorkspaceConfigForDocume
 }
 
 function calculateWorkspaceConfigForDocument(docUri: Uri | undefined): WorkspaceConfigForDocument {
-    const cfg = inspectConfigKeys(docUri, ['words', 'userWords', 'ignoreWords']);
+    const scope = findConicalDocumentScope(docUri);
+    const cfg = inspectConfigKeys(scope, ['words', 'userWords', 'ignoreWords']);
     const workspaceFile = workspace.workspaceFile?.toString();
-    const workspaceFolder = docUri && workspace.getWorkspaceFolder(docUri)?.uri.toString();
+    const workspaceFolder = scope && workspace.getWorkspaceFolder(scope)?.uri.toString();
 
     const allowFolder = workspaceFile !== undefined;
 

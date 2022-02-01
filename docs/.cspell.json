@@ -1,0 +1,24 @@
+{
+  "dictionaries": ["custom-dictionary"],
+  "dictionaryDefinitions": [
+    {
+      "name": "custom-dictionary",
+      "path": "./.cspell/custom-dictionary.txt",
+      "addWords": true
+    }
+  ],
+  "languageSettings": [
+    {
+      "languageId": "markdown",
+      "patterns": [
+        {
+          "name": "Internal Link",
+          "pattern": "/(?<=\\])\\(#\\w+\\)/g"
+        }
+      ],
+      "ignoreRegExpList": ["Internal Link"]
+    }
+  ],
+  "enableFiletypes": ["ruby"],
+  "ignorePaths": ["_site/**"]
+}

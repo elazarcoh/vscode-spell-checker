@@ -1,0 +1,34 @@
+on:
+  release:
+    types:
+      - published
+  # push:
+  #   # Sequence of patterns matched against refs/tags
+  #   tags:
+  #     - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+
+name: Upload Release Assets
+
+jobs:
+  build:
+    name: Upload Assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2.4.0
+      - uses: actions/setup-node@v2
+        with:
+          cache: yarn
+      - name: Install
+        run: yarn --frozen-lockfile
+      - name: Build Extension .vsix
+        run: yarn run package-extension
+      - run: zip code-spell-checker build/*
+      - name: Upload Assets
+        uses: alexellis/upload-assets@0.3.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          asset_paths: '["build/code-spell*.vsix"]'
+
+# cspell:ignore vsix alexellis prereleased

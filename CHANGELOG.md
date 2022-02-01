@@ -2,6 +2,157 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### 2.1.4 (2022-01-12)
+
+
+### Bug Fixes
+
+* Remove words ([#1672](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1672)) ([bd0e821](https://github.com/streetsidesoftware/vscode-spell-checker/commit/bd0e8214b52c1dba836f8100f9a5d85542103ec7)), closes [#1671](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1671)
+
+### 2.1.3 (2022-01-11)
+
+### [2.1.2](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.1.2-test-3...v2.1.2) (2022-01-11)
+
+### [2.1.1](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.1.0...v2.1.1) (2022-01-10)
+
+### [2.0.15](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.14-test-2...v2.0.15) (2022-01-10)
+
+### [2.0.14](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.13...v2.0.14) (2021-12-06)
+
+
+### Bug Fixes
+
+* Use VS Code file watcher for config file changes. ([#1579](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1579)) ([add7ae9](https://github.com/streetsidesoftware/vscode-spell-checker/commit/add7ae9b37b7d02eadfbd2788ab0b0d6699e09d6)), closes [#1572](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1572)
+
+### [2.0.13](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.12...v2.0.13) (2021-11-19)
+
+
+### Bug Fixes
+
+* docs/Gemfile & docs/Gemfile.lock to reduce vulnerabilities ([#1539](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1539)) ([30abf4f](https://github.com/streetsidesoftware/vscode-spell-checker/commit/30abf4fb79e5dd5e3c3b92f4b36192decf74aa44))
+* Put cspell autocompletion behind a configuration setting. ([#1545](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1545)) ([c5b0b7f](https://github.com/streetsidesoftware/vscode-spell-checker/commit/c5b0b7f6c75a29553156d59473f13de1da59866e))
+* use short path name in statusbar message. ([#1485](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1485)) ([6edabe7](https://github.com/streetsidesoftware/vscode-spell-checker/commit/6edabe781b8de4f94c85cc1a994f70f77de0988f))
+
+### [2.0.12](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.11...v2.0.12) (2021-10-29)
+
+
+### Bug Fixes
+
+* Blocked Files Pop-up ([#1483](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1483)) ([224498d](https://github.com/streetsidesoftware/vscode-spell-checker/commit/224498d82122941a073efae16f7650657ecc23da)), closes [#1482](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1482) [#1428](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1428)
+
+### [2.0.11](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.10...v2.0.11) (2021-10-28)
+
+
+### Bug Fixes
+
+* Fix issue with links in info page. ([#1478](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1478)) ([d4de03e](https://github.com/streetsidesoftware/vscode-spell-checker/commit/d4de03e5c296f53957102d06ab430b7d83c1804a))
+* Fix issue with validation not running after config change ([#1480](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1480)) ([ec1638f](https://github.com/streetsidesoftware/vscode-spell-checker/commit/ec1638f121f80feb9ef6be02e26d20604b890c9d)), closes [#1421](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1421)
+* fix wording of excluded message ([#1432](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1432)) ([1c3a6f7](https://github.com/streetsidesoftware/vscode-spell-checker/commit/1c3a6f7609a76ced617f24198b72503938e2346b))
+
+### [2.0.10](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v0.1.1...v2.0.10) (2021-10-09)
+
+
+### Bug Fixes
+
+* Improve handling of `.gitignore` ([#1422](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1422)) ([ad20c84](https://github.com/streetsidesoftware/vscode-spell-checker/commit/ad20c84dc04f28b2d96ff10032fdd302eba33ab6))
+
+### [2.0.9](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.8...v2.0.9) (2021-10-06)
+
+
+### Bug Fixes
+
+* Support ignoring files matching `.gitignore` globs ([#1405](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1405)) ([b05fbc7](https://github.com/streetsidesoftware/vscode-spell-checker/commit/b05fbc73fb9d3b9692d2afbda205241d897c4e04))
+
+### [2.0.8](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.8-alpha.0...v2.0.8) (2021-09-29)
+
+
+### Bug Fixes
+
+* Fix adding words in Notebooks ([#1369](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1369)) ([1b89313](https://github.com/streetsidesoftware/vscode-spell-checker/commit/1b89313a9a7b28e151eba174b9949a3c5932711e)), closes [#1353](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1353)
+
+### [2.0.8-alpha.0](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.7...v2.0.8-alpha.0) (2021-09-29)
+
+
+### Bug Fixes
+
+* docs/Gemfile & docs/Gemfile.lock to reduce vulnerabilities ([#1361](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1361)) ([2bf5875](https://github.com/streetsidesoftware/vscode-spell-checker/commit/2bf58753b55667aac034d743f51fa6bb84ccc654))
+
+### [2.0.7](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.7-alpha.1...v2.0.7) (2021-09-23)
+
+### [2.0.7-alpha.1](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.7-alpha.0...v2.0.7-alpha.1) (2021-09-23)
+
+
+### Bug Fixes
+
+* Make sure the VS Code instance of Uri is used ([#1342](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1342)) ([4e612c6](https://github.com/streetsidesoftware/vscode-spell-checker/commit/4e612c6c89e9ec3aed240ad8ab52b047188f2b66)), closes [#1341](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1341)
+
+### [2.0.7-alpha.0](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.6...v2.0.7-alpha.0) (2021-09-20)
+
+### [2.0.6](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.5...v2.0.6) (2021-09-20)
+
+
+### Bug Fixes
+
+* Always add a new line at the end of ([#1316](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1316)) ([62b7894](https://github.com/streetsidesoftware/vscode-spell-checker/commit/62b7894287335de92ac0f5a06ceb87e2e266a347))
+* check all files by default ([#1314](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1314)) ([30853a6](https://github.com/streetsidesoftware/vscode-spell-checker/commit/30853a654be5ee6ce0b15b55a30c53bb7033a84d)), closes [#1283](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1283) [#1308](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1308)
+* Fix add / remove locale from configuration ([#1325](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1325)) ([b5699ef](https://github.com/streetsidesoftware/vscode-spell-checker/commit/b5699eff5ee1357022aa0480abb3c92e784ee3da))
+* Fix Enable / Disable Locale matching logic. ([#1318](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1318)) ([b745e39](https://github.com/streetsidesoftware/vscode-spell-checker/commit/b745e39b38480cf24f2e912dbce7f133c249a5b8))
+* Fix Toggle Enable Spell Checker  ([#1329](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1329)) ([0812d6a](https://github.com/streetsidesoftware/vscode-spell-checker/commit/0812d6ae3f8a533e1c425a8fb61d425f7cb361d2)), closes [#1289](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1289)
+
+### [2.0.5](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.4...v2.0.5) (2021-09-12)
+
+
+### Bug Fixes
+
+* Fix References to version "0.1" ([#1266](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1266)) ([85f6e58](https://github.com/streetsidesoftware/vscode-spell-checker/commit/85f6e586c120a3273a71a49ae9c43d4f876658da))
+* Upgrade to cspell `5.9.1` ([#1293](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1293)) ([309fd28](https://github.com/streetsidesoftware/vscode-spell-checker/commit/309fd2805c02d58350ae7705a49bfb0448460c34))
+
+### [2.0.4](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.4-alpha.0...v2.0.4) (2021-09-03)
+
+
+### Bug Fixes
+
+* Increase limits to help with [#1256](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1256) ([#1262](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1262)) ([f5efa0b](https://github.com/streetsidesoftware/vscode-spell-checker/commit/f5efa0b036a7732a617333b1a9034e2758913ba8))
+
+### [2.0.4-alpha.0](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.3...v2.0.4-alpha.0) (2021-09-02)
+
+
+### Bug Fixes
+
+* Have the completion provider auto fill ignore, words, and dictionaries ([#1255](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1255)) ([98f17f2](https://github.com/streetsidesoftware/vscode-spell-checker/commit/98f17f2f759a8884f5b135f2628f435a6f47e29b))
+* make `cSpell.blockCheckingWhen*` settings `language-overridable` ([#1258](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1258)) ([08e8359](https://github.com/streetsidesoftware/vscode-spell-checker/commit/08e83591e4e11953be7b65335e87c96dd3a199c4))
+
+### [2.0.3](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.2...v2.0.3) (2021-09-02)
+
+
+### Bug Fixes
+
+* Support Jupyter Notebooks ([#1253](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1253)) ([6fe65a6](https://github.com/streetsidesoftware/vscode-spell-checker/commit/6fe65a66417cdf58b220406f960491155cd6e5cc))
+
+### [2.0.2](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.1...v2.0.2) (2021-09-01)
+
+
+### Bug Fixes
+
+* Make sure the LICENSE file is NOT ignored ([#1249](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1249)) ([827d80f](https://github.com/streetsidesoftware/vscode-spell-checker/commit/827d80f1b271b7f7a1dcf634cdf5b3cf2731dad0))
+
+### [2.0.1](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.1-alpha.21...v2.0.1) (2021-09-01)
+
+
+### Bug Fixes
+
+* Update homepage to point to the new docs. ([#1239](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1239)) ([b0573f7](https://github.com/streetsidesoftware/vscode-spell-checker/commit/b0573f72472f5cb41593de1d54506121d7a31bea))
+
+### [2.0.1-alpha.21](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.1-alpha.20...v2.0.1-alpha.21) (2021-08-31)
+
+### [2.0.1-alpha.20](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.1-alpha.19...v2.0.1-alpha.20) (2021-08-30)
+
+
+### Bug Fixes
+
+* Make suggestions menu consistent ([#1227](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1227)) ([7b53242](https://github.com/streetsidesoftware/vscode-spell-checker/commit/7b53242c191572bfdf850ea28cfd4a617c235604))
+* Make sure it is possible to spell check all files in a workspace ([#1219](https://github.com/streetsidesoftware/vscode-spell-checker/issues/1219)) ([80745fa](https://github.com/streetsidesoftware/vscode-spell-checker/commit/80745fabce03dc6bdb4eb4ac1fea9156b26f3093))
+
 ### [2.0.1-alpha.19](https://github.com/streetsidesoftware/vscode-spell-checker/compare/v2.0.1-alpha.18...v2.0.1-alpha.19) (2021-08-28)
 
 
